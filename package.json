@@ -1,0 +1,11 @@
+{
+  "type": "module",
+  "scripts": {
+    "start": "node main.js"
+  },
+  "dependencies": {
+    "fast-xml-parser": "^5.5.2",
+    "inquirer": "^13.3.0",
+    "undici": "^7.22.0"
+  }
+}
