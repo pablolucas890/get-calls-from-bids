@@ -105,7 +105,7 @@ if (!SHOW_HELP && !justWithAi) {
   fs.writeFileSync('public/show-help.txt', '')
 }
 
-// Get Bids from Portal de contas oublicas
+// Get Bids from Portal de contas publicas
 console.clear()
 console.log('\n\n\t\tBuscando editais...\n\n')
 console.log('[PORTAL DE COMPRAS PÚBLICAS]\n')
@@ -304,7 +304,7 @@ for (let i = 0; i < allItens.length; i++) {
   console.log(`[LINKS]\n\t${links.split(', ').join('\n\t')}\n`)
   const userRes = await ask('Descartar este item? [Y = Descartar, N = Ler mais tarde] (default: Y)')
 
-  if (userRes.confirm) {
+  if (userRes) {
     await handleDelete(deletedItens, readLaterItens, description, links)
   } else if (!hasReadLater) {
     readLaterItens.push({ description, links })
