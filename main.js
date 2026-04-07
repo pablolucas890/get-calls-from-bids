@@ -64,8 +64,7 @@ for (let i = 0; i < KEYS_TO_INCLUDE.length; i++) {
     for (const item of portalDeContasResponse?.result ?? []) {
       const links = `https://www.portaldecompraspublicas.com.br/processos${item.urlReferencia}`
       if (item?.statusProcessoPublico?.descricao == 'Recebendo Propostas'
-        || item?.statusProcessoPublico?.descricao == 'Aguardando Inicio de Recebimento de Propostas'
-        || item?.statusProcessoPublico?.descricao == 'Sessão Pública Iniciada') {
+        || item?.statusProcessoPublico?.descricao == 'Aguardando Inicio de Recebimento de Propostas') {
         if (allItens.some(e => e.links === links || e.description === item.resumo)) {
           continue
         }
