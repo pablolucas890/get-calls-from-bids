@@ -49,7 +49,6 @@ async function aiSaysItsWorthIt(title, model) {
   const afterAiTimeout = timeoutToWait
   const difference = afterAiTimeout - beforeAiTimeout
   if (difference < DEFAULT_TIMEOUT_TO_WAIT) {
-    console.log('Aguardando mais ' + (DEFAULT_TIMEOUT_TO_WAIT - difference) + ' segundos...')
     await new Promise(resolve => setTimeout(resolve, (DEFAULT_TIMEOUT_TO_WAIT - difference) * 1000))
   }
   const aiText = (response.text ?? '').trim().toUpperCase()
@@ -132,7 +131,7 @@ if ((await ask('Deseja buscar editais no Gov.BR? [Y = Sim, N = Não] (default: Y
       console.log(`Buscando editais para a chave: [${key}] na página: [${i + 1}]`)
       for (const item of govBrResponse?.items ?? []) {
         const description = item.description
-        const links = `https://pncp.gov.br${item.item_url}`
+        const links = `https://pncp.gov.br${item.item_url.replace('compras', 'editais')}`
         if (allItens.some(e => e.links === links || e.description === description)) continue
         allItens.push({ description, links })
       }
