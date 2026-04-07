@@ -1,3 +1,5 @@
+import { GoogleGenAI } from "@google/genai";
+import dotenv from 'dotenv';
 import { XMLParser } from 'fast-xml-parser';
 import fs from 'fs';
 import inquirer from 'inquirer';
@@ -5,16 +7,56 @@ import { Agent, setGlobalDispatcher } from 'undici';
 
 const KEYS_TO_INCLUDE = fs.readFileSync('public/keys-include.txt', 'utf8').split('\n').filter(e => e.trim() !== '').map(e => e.trim())
 const KEYS_TO_EXCLUDE = fs.readFileSync('public/keys-exclude.txt', 'utf8').split('\n').filter(e => e.trim() !== '').map(e => e.trim())
+const MODELS = [
+  'gemini-3-flash-preview',
+  'gemini-3.1-flash-lite-preview',
+  'gemini-2.5-pro',
+  'gemini-2.5-flash',
+  'gemini-2.5-flash-lite',
+  'gemini-2.5-flash-lite-preview-09-2025',
+  'gemini-2.0-flash',
+  'gemini-2.0-flash-lite'
+]
 
 let allItens = []
+let selectedModelIndex = 0
 let deletedItens = JSON.parse(fs.existsSync('public/deleted.json') ? fs.readFileSync('public/deleted.json', 'utf8') || '[]' : '[]')
 let readLaterItens = JSON.parse(fs.existsSync('public/read-later.json') ? fs.readFileSync('public/read-later.json', 'utf8') || '[]' : '[]')
 
 const showHelp = fs.existsSync('public/show-help.txt')
 const message = 'Precione qualquer tecla para continuar...'
 
+dotenv.config();
+const ai = new GoogleGenAI({ apiKey: process.env.GOOGLE_API_KEY });
+
+if (!ai.apiKey) {
+  console.error('API KEY não encontrada')
+  process.exit(1)
+}
+
+async function aiSaysItsWorthIt(title, model) {
+  await new Promise(resolve => setTimeout(resolve, 6000))
+  const EDITAL_ANALYSIS_PROMPT = fs.readFileSync('public/it-is-worth-it-prompt.txt', 'utf8')
+  const prompt = EDITAL_ANALYSIS_PROMPT.replace('{{COLE AQUI O TÍTULO}}', title)
+  const response = await ai.models.generateContent({
+    model: model,
+    contents: prompt,
+  })
+  const aiText = (response.text ?? '').trim().toUpperCase()
+  return aiText
+}
+
+console.clear()
+const justWithAi = await inquirer.prompt([
+  {
+    type: 'confirm',
+    name: 'confirm',
+    message: 'Deseja analisar os editais somente via AI? [Y = Sim, N = Não] (default: N)'
+  }
+]).then(res => res.confirm ?? false)
+
 // Bootstrapping
-if (!showHelp) {
+if (!showHelp && !justWithAi) {
   const helpTextToShow = [
     '[TIPO] Nesta linha você saberá se é um novo edital ou se é um edital que você já leu e marcou para ler mais tarde\n\n',
     '[PALAVRA-CHAVE] Nesta linha você saberá a palavra-chave que foi usada para encontrar o edital como "SOFTWARE", "SISTEMA"\n\n',
@@ -53,22 +95,37 @@ console.clear()
 console.log('\n\n\t\tBuscando editais...\n\n')
 
 // Get Bids from Portal de contas oublicas
-console.log('BUSCANDO EDITAIS NO [PORTAL DE COMPRAS PÚBLICAS]\n')
-const maxPages = 1
-const portalDeContasUrl = 'https://compras.api.portaldecompraspublicas.com.br/v2/licitacao/processos?limitePagina=12&filtroOrdenacao=3&objeto='
-for (let i = 0; i < KEYS_TO_INCLUDE.length; i++) {
-  const key = KEYS_TO_INCLUDE[i]
-  for (let j = 0; j < maxPages; j++) {
-    console.log('Buscando editais para a chave: ' + key + ' na página: ' + j)
-    const portalDeContasResponse = await fetch(portalDeContasUrl + key + '&pagina=' + j).then(res => res.json())
-    for (const item of portalDeContasResponse?.result ?? []) {
-      const links = `https://www.portaldecompraspublicas.com.br/processos${item.urlReferencia}`
-      if (item?.statusProcessoPublico?.descricao == 'Recebendo Propostas'
-        || item?.statusProcessoPublico?.descricao == 'Aguardando Inicio de Recebimento de Propostas') {
-        if (allItens.some(e => e.links === links || e.description === item.resumo)) {
-          continue
+console.log('[PORTAL DE COMPRAS PÚBLICAS]\n')
+const searchOnPortal = await inquirer.prompt([
+  {
+    type: 'confirm',
+    name: 'confirm',
+    message: 'Deseja buscar editais no Portal de Compras Públicas? [Y = Sim, N = Não] (default: Y)'
+  }
+]).then(res => res.confirm ?? true)
+if (searchOnPortal) {
+  const maxPages = await inquirer.prompt([
+    {
+      type: 'input',
+      name: 'maxPages',
+      message: 'Quantas páginas deseja buscar? [default: 2]'
+    }
+  ]).then(res => parseInt(res.maxPages ?? 2)) ?? 2
+  const portalDeContasUrl = 'https://compras.api.portaldecompraspublicas.com.br/v2/licitacao/processos?limitePagina=12&filtroOrdenacao=3&objeto='
+  for (let i = 0; i < KEYS_TO_INCLUDE.length; i++) {
+    const key = KEYS_TO_INCLUDE[i]
+    for (let j = 0; j < maxPages; j++) {
+      console.log('Buscando editais para a chave: ' + key + ' na página: ' + j)
+      const portalDeContasResponse = await fetch(portalDeContasUrl + key + '&pagina=' + j).then(res => res.json())
+      for (const item of portalDeContasResponse?.result ?? []) {
+        const links = `https://www.portaldecompraspublicas.com.br/processos${item.urlReferencia}`
+        if (item?.statusProcessoPublico?.descricao == 'Recebendo Propostas'
+          || item?.statusProcessoPublico?.descricao == 'Aguardando Inicio de Recebimento de Propostas') {
+          if (allItens.some(e => e.links === links || e.description === item.resumo)) {
+            continue
+          }
+          allItens.push({ description: item.resumo, links })
         }
-        allItens.push({ description: item.resumo, links })
       }
     }
   }
@@ -76,11 +133,14 @@ for (let i = 0; i < KEYS_TO_INCLUDE.length; i++) {
 
 // Get Bids from Alertalicitacao (CNAE Numbers)
 console.clear()
-console.log('BUSCANDO EDITAIS NO [ALERTALICITAÇÃO]\n')
-const cnaeNumbers = [986, 987, 988]
+console.log('\n\n\t\tBuscando editais...\n\n')
+console.log('[ALERTALICITAÇÃO]\n')
+const cnaeNumbers = [985, 986, 987, 988]
 const cnaeUrl = 'https://alertalicitacao.com.br'
 for (const cnaeNumber of cnaeNumbers) {
+  console.log('Buscando editais para o CNAE: ' + cnaeNumber)
   for (let i = 0; i < 5; i++) {
+    console.log('Buscando editais para o CNAE: ' + cnaeNumber + ' na página: ' + i)
     const cnaeResponse = await fetch(cnaeUrl + '/!cnae/' + cnaeNumber);
     const cnaeText = await cnaeResponse.text();
     cnaeText.replace(/[\r\n]+/g, ' ').split('Cadastrar-se')[1].split('panel').forEach(e => {
@@ -119,7 +179,8 @@ for (const cnaeNumber of cnaeNumbers) {
 
 // Get Bids from Pocos de Caldas (Editais)
 console.clear()
-console.log('BUSCANDO EDITAIS NO [POCOS DE CALDAS]\n')
+console.log('\n\n\t\tBuscando editais...\n\n')
+console.log('[POCOS DE CALDAS]\n')
 const agent = new Agent({ connect: { rejectUnauthorized: false } });
 setGlobalDispatcher(agent);
 const pocosDeCaldasUrl = 'https://services.pocosdecaldas.mg.gov.br/editais/login.xhtml'
@@ -206,6 +267,45 @@ for (const { description, links } of allItens) {
 
   if (!matchedKey) continue
 
+  const handleDeleteOrReadLater = async () => {
+    deletedItens.push({ description, links })
+
+    const map = new Map()
+    for (const item of deletedItens) {
+      if (!item || !item.description) continue
+      if (!map.has(item.description)) {
+        map.set(item.description, item)
+      }
+    }
+    deletedItens = Array.from(map.values())
+
+    readLaterItens = readLaterItens.filter(e => e.description !== description)
+    fs.writeFileSync('public/read-later.json', JSON.stringify(readLaterItens, null, 2))
+    fs.writeFileSync('public/deleted.json', JSON.stringify(deletedItens, null, 2))
+  }
+
+  if (justWithAi) {
+    console.clear()
+    console.log(`[DESCRIÇÃO] ${description}\n`)
+    console.log(`Analisando edital com o modelo: ${MODELS[selectedModelIndex]}, aguarde...`)
+    let aiText = null
+    try {
+      aiText = await aiSaysItsWorthIt(description, MODELS[selectedModelIndex])
+    }
+    catch (error) {
+      selectedModelIndex = (selectedModelIndex + 1) % MODELS.length
+      console.clear()
+      console.log(`Erro ao analisar edital, tentando com o modelo: ${MODELS[selectedModelIndex]}`)
+      await new Promise(resolve => setTimeout(resolve, 6000))
+      continue
+    }
+    console.log(`[AI] ${aiText}\n`)
+    await new Promise(resolve => setTimeout(resolve, 1000))
+    if (aiText.includes('NÃO VALE A PENA')) {
+      await handleDeleteOrReadLater()
+      continue
+    }
+  }
   const hasReadLater = readLaterItens.some(e => e.description === description)
   console.clear()
   console.log(`[TIPO] ${hasReadLater ? 'Ler mais tarde' : 'Novo'}\n`)
@@ -221,23 +321,11 @@ for (const { description, links } of allItens) {
   ])
 
   if (userRes.confirm) {
-    deletedItens.push({ description, links })
-
-    const map = new Map()
-    for (const item of deletedItens) {
-      if (!item || !item.description) continue
-      if (!map.has(item.description)) {
-        map.set(item.description, item)
-      }
-    }
-    deletedItens = Array.from(map.values())
-
-    readLaterItens = readLaterItens.filter(e => e.description !== description)
-    fs.writeFileSync('public/read-later.json', JSON.stringify(readLaterItens, null, 2))
-    fs.writeFileSync('public/deleted.json', JSON.stringify(deletedItens, null, 2))
+    await handleDeleteOrReadLater()
   } else if (!hasReadLater) {
     readLaterItens.push({ description, links })
     fs.writeFileSync('public/read-later.json', JSON.stringify(readLaterItens, null, 2))
+    await handleDeleteOrReadLater()
   }
 }
 

@@ -4,6 +4,8 @@
     "start": "node main.js"
   },
   "dependencies": {
+    "@google/genai": "^1.48.0",
+    "dotenv": "^17.4.1",
     "fast-xml-parser": "^5.5.2",
     "inquirer": "^13.3.0",
     "undici": "^7.22.0"

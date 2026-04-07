@@ -2,5 +2,6 @@
 
 ## Run
 
+- Set Google API Key into `.env` like `.env.example`
 - `npm i`
 - `npm start`
