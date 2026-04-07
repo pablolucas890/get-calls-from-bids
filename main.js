@@ -53,7 +53,7 @@ console.clear()
 console.log('\n\n\t\tBuscando editais...\n\n')
 
 // Get Bids from Portal de contas oublicas
-console.log('BUSCANDO EDITALS NO [PORTAL DE COMPRAS PÚBLICAS]\n')
+console.log('BUSCANDO EDITAIS NO [PORTAL DE COMPRAS PÚBLICAS]\n')
 const maxPages = 1
 const portalDeContasUrl = 'https://compras.api.portaldecompraspublicas.com.br/v2/licitacao/processos?limitePagina=12&filtroOrdenacao=3&objeto='
 for (let i = 0; i < KEYS_TO_INCLUDE.length; i++) {
@@ -63,17 +63,21 @@ for (let i = 0; i < KEYS_TO_INCLUDE.length; i++) {
     const portalDeContasResponse = await fetch(portalDeContasUrl + key + '&pagina=' + j).then(res => res.json())
     for (const item of portalDeContasResponse?.result ?? []) {
       const links = `https://www.portaldecompraspublicas.com.br/processos${item.urlReferencia}`
-      if (allItens.some(e => e.links === links || e.description === item.resumo)) {
-        continue
+      if (item?.statusProcessoPublico?.descricao == 'Recebendo Propostas'
+        || item?.statusProcessoPublico?.descricao == 'Aguardando Inicio de Recebimento de Propostas'
+        || item?.statusProcessoPublico?.descricao == 'Sessão Pública Iniciada') {
+        if (allItens.some(e => e.links === links || e.description === item.resumo)) {
+          continue
+        }
+        allItens.push({ description: item.resumo, links })
       }
-      allItens.push({ description: item.resumo, links })
     }
   }
 }
 
 // Get Bids from Alertalicitacao (CNAE Numbers)
 console.clear()
-console.log('BUSCANDO EDITALS NO [ALERTALICITAÇÃO]\n')
+console.log('BUSCANDO EDITAIS NO [ALERTALICITAÇÃO]\n')
 const cnaeNumbers = [986, 987, 988]
 const cnaeUrl = 'https://alertalicitacao.com.br'
 for (const cnaeNumber of cnaeNumbers) {
@@ -116,7 +120,7 @@ for (const cnaeNumber of cnaeNumbers) {
 
 // Get Bids from Pocos de Caldas (Editais)
 console.clear()
-console.log('BUSCANDO EDITALS NO [POCOS DE CALDAS]\n')
+console.log('BUSCANDO EDITAIS NO [POCOS DE CALDAS]\n')
 const agent = new Agent({ connect: { rejectUnauthorized: false } });
 setGlobalDispatcher(agent);
 const pocosDeCaldasUrl = 'https://services.pocosdecaldas.mg.gov.br/editais/login.xhtml'
