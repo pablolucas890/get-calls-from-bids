@@ -20,12 +20,15 @@ const MODELS = [
 ]
 const SHOW_HELP = fs.existsSync('public/show-help.txt')
 const MESSAGE = 'Precione qualquer tecla para continuar...'
+const DEFAULT_TIMEOUT_TO_WAIT = 6
+const EDITAL_ANALYSIS_PROMPT = fs.readFileSync('public/it-is-worth-it-prompt.txt', 'utf8')
 
 // Variables
 let allItens = []
 let selectedModelIndex = 0
 let deletedItens = JSON.parse(fs.existsSync('public/deleted.json') ? fs.readFileSync('public/deleted.json', 'utf8') || '[]' : '[]')
 let readLaterItens = JSON.parse(fs.existsSync('public/read-later.json') ? fs.readFileSync('public/read-later.json', 'utf8') || '[]' : '[]')
+let timeoutToWait = 0
 
 // Config
 dotenv.config();
@@ -38,13 +41,17 @@ if (!ai.apiKey) {
 
 // Functions
 async function aiSaysItsWorthIt(title, model) {
-  await new Promise(resolve => setTimeout(resolve, 6000))
-  const EDITAL_ANALYSIS_PROMPT = fs.readFileSync('public/it-is-worth-it-prompt.txt', 'utf8')
-  const prompt = EDITAL_ANALYSIS_PROMPT.replace('{{COLE AQUI O TÍTULO}}', title)
+  const beforeAiTimeout = timeoutToWait
   const response = await ai.models.generateContent({
     model: model,
-    contents: prompt,
+    contents: EDITAL_ANALYSIS_PROMPT.replace('{{COLE AQUI O TÍTULO}}', title),
   })
+  const afterAiTimeout = timeoutToWait
+  const difference = afterAiTimeout - beforeAiTimeout
+  if (difference < DEFAULT_TIMEOUT_TO_WAIT) {
+    console.log('Aguardando mais ' + (DEFAULT_TIMEOUT_TO_WAIT - difference) + ' segundos...')
+    await new Promise(resolve => setTimeout(resolve, (DEFAULT_TIMEOUT_TO_WAIT - difference) * 1000))
+  }
   const aiText = (response.text ?? '').trim().toUpperCase()
   return aiText
 }
@@ -70,7 +77,14 @@ async function handleDelete(deletedItens, readLaterItens, description, links) {
   fs.writeFileSync('public/deleted.json', JSON.stringify(deletedItens, null, 2))
 }
 
+async function decreaseTimeoutToWait() {
+  await new Promise(resolve => setTimeout(resolve, 1000))
+  timeoutToWait++
+  decreaseTimeoutToWait()
+}
+
 // Bootstrapping
+decreaseTimeoutToWait()
 console.clear()
 const justWithAi = (await ask('Deseja analisar os editais somente via AI? [Y = Sim, N = Não] (default: N)')) || false
 
@@ -105,6 +119,27 @@ if (!SHOW_HELP && !justWithAi) {
   fs.writeFileSync('public/show-help.txt', '')
 }
 
+// Get Bids from Gov
+console.clear()
+console.log('\n\n\t\tBuscando editais...\n\n')
+console.log('[GOV.BR]\n')
+if ((await ask('Deseja buscar editais no Gov.BR? [Y = Sim, N = Não] (default: Y)'))) {
+  const govBrMaxPages = (await ask('Quantas páginas deseja buscar? [default: 1]', 'input')) || 1
+  for (const key of KEYS_TO_INCLUDE) {
+    for (let i = 0; i < govBrMaxPages; i++) {
+      const govBrUrl = 'https://pncp.gov.br/api/search/?tipos_documento=edital&ordenacao=-data&pagina=' + (i + 1) + '&tam_pagina=10&status=recebendo_proposta&modalidades=6%7C8&tipos=1&q='
+      const govBrResponse = await fetch(govBrUrl + key).then(res => res.json())
+      console.log(`Buscando editais para a chave: [${key}] na página: [${i + 1}]`)
+      for (const item of govBrResponse?.items ?? []) {
+        const description = item.description
+        const links = `https://pncp.gov.br${item.item_url}`
+        if (allItens.some(e => e.links === links || e.description === description)) continue
+        allItens.push({ description, links })
+      }
+    }
+  }
+}
+
 // Get Bids from Portal de contas publicas
 console.clear()
 console.log('\n\n\t\tBuscando editais...\n\n')
@@ -134,23 +169,25 @@ if ((await ask('Deseja buscar editais no Portal de Compras Públicas? [Y = Sim, 
 console.clear()
 console.log('\n\n\t\tBuscando editais...\n\n')
 console.log('[ALERTALICITAÇÃO]\n')
-const cnaeNumbers = [985, 986, 987, 988]
-const alertaLicitacaoMaxPages = (await ask('Quantas páginas deseja buscar? [default: 5]', 'input')) || 5
-const cnaeUrl = 'https://alertalicitacao.com.br'
-for (const cnaeNumber of cnaeNumbers) {
-  console.log('Buscando editais para o CNAE: [' + cnaeNumber + ']')
-  for (let i = 0; i < alertaLicitacaoMaxPages; i++) {
-    console.log('Buscando editais para o CNAE: [' + cnaeNumber + '] na página: [' + (i + 1) + ']')
-    const cnaeResponse = await fetch(cnaeUrl + '/!cnae/' + cnaeNumber);
-    const cnaeText = await cnaeResponse.text();
-    cnaeText.replace(/[\r\n]+/g, ' ').split('Cadastrar-se')[1].split('panel').forEach(e => {
-      const description = e.split('no-class')[1]?.split('</b>')[1].trim()?.split('</p>')[0].trim().replace(/[.]+/g, '')
-      const href = e.split('href =')[1]?.split('title=')[0].replace(/['"]/g, '')
-      const links = cnaeUrl + href + ', ' + cnaeUrl + '/!cnae/' + cnaeNumber
-      if (description && href && !allItens.some(e => e.links === links || e.description === description)) {
-        allItens.push({ description, links })
-      }
-    })
+if ((await ask('Deseja buscar editais no Alertalicitacao? [Y = Sim, N = Não] (default: Y)'))) {
+  const cnaeNumbers = [985, 986, 987, 988]
+  const alertaLicitacaoMaxPages = (await ask('Quantas páginas deseja buscar? [default: 5]', 'input')) || 5
+  const cnaeUrl = 'https://alertalicitacao.com.br'
+  for (const cnaeNumber of cnaeNumbers) {
+    console.log('Buscando editais para o CNAE: [' + cnaeNumber + ']')
+    for (let i = 0; i < alertaLicitacaoMaxPages; i++) {
+      console.log('Buscando editais para o CNAE: [' + cnaeNumber + '] na página: [' + (i + 1) + ']')
+      const cnaeResponse = await fetch(cnaeUrl + '/!cnae/' + cnaeNumber);
+      const cnaeText = await cnaeResponse.text();
+      cnaeText.replace(/[\r\n]+/g, ' ').split('Cadastrar-se')[1].split('panel').forEach(e => {
+        const description = e.split('no-class')[1]?.split('</b>')[1].trim()?.split('</p>')[0].trim().replace(/[.]+/g, '')
+        const href = e.split('href =')[1]?.split('title=')[0].replace(/['"]/g, '')
+        const links = cnaeUrl + href + ', ' + cnaeUrl + '/!cnae/' + cnaeNumber
+        if (description && href && !allItens.some(e => e.links === links || e.description === description)) {
+          allItens.push({ description, links })
+        }
+      })
+    }
   }
 }
 
@@ -181,63 +218,65 @@ for (const cnaeNumber of cnaeNumbers) {
 console.clear()
 console.log('\n\n\t\tBuscando editais...\n\n')
 console.log('[POCOS DE CALDAS]\n')
-const pocosDeCaldasMaxPages = (await ask('Quantas páginas deseja buscar? [default: 10]', 'input')) || 10
-const agent = new Agent({ connect: { rejectUnauthorized: false } });
-setGlobalDispatcher(agent);
-const pocosDeCaldasUrl = 'https://services.pocosdecaldas.mg.gov.br/editais/login.xhtml'
-const headers = {
-  'Cache-Control': 'no-cache',
-  'Accept': 'application/xml, text/xml, */*; q=0.01',
-  'Accept-Encoding': 'gzip, deflate, br, zstd',
-  'Accept-Language': 'en-US,en;q=0.5',
-  'Connection': 'keep-alive',
-  'Content-Type': 'application/x-www-form-urlencoded; charset=UTF-8',
-  'Cookie': 'JSESSIONID=d5431c1f7670d0a9bd12186a77c4; ' +
-    '_ga_9CX7TK4815=GS2.1.s1773239724$o9$g1$t1773239746$j38$l0$h0; ' +
-    '_ga=GA1.1.42366458.1752691011; ' +
-    '_ga_81T8RNHFB7=GS2.1.s1773239749$o4$g1$t1773239768$j41$l0$h0',
-  'DNT': '1',
-  'Faces-Request': 'partial/ajax',
-  'Host': 'services.pocosdecaldas.mg.gov.br',
-  'Origin': 'https://services.pocosdecaldas.mg.gov.br',
-  'Priority': 'u=0',
-  'Referer': 'https://services.pocosdecaldas.mg.gov.br/editais/',
-  'Sec-Fetch-Dest': 'empty',
-  'Sec-Fetch-Mode': 'cors',
-  'Sec-Fetch-Site': 'same-origin',
-  'X-Requested-With': 'XMLHttpRequest'
-};
+if ((await ask('Deseja buscar editais no Pocos de Caldas? [Y = Sim, N = Não] (default: Y)'))) {
+  const pocosDeCaldasMaxPages = (await ask('Quantas páginas deseja buscar? [default: 10]', 'input')) || 10
+  const agent = new Agent({ connect: { rejectUnauthorized: false } });
+  setGlobalDispatcher(agent);
+  const pocosDeCaldasUrl = 'https://services.pocosdecaldas.mg.gov.br/editais/login.xhtml'
+  const headers = {
+    'Cache-Control': 'no-cache',
+    'Accept': 'application/xml, text/xml, */*; q=0.01',
+    'Accept-Encoding': 'gzip, deflate, br, zstd',
+    'Accept-Language': 'en-US,en;q=0.5',
+    'Connection': 'keep-alive',
+    'Content-Type': 'application/x-www-form-urlencoded; charset=UTF-8',
+    'Cookie': 'JSESSIONID=d5431c1f7670d0a9bd12186a77c4; ' +
+      '_ga_9CX7TK4815=GS2.1.s1773239724$o9$g1$t1773239746$j38$l0$h0; ' +
+      '_ga=GA1.1.42366458.1752691011; ' +
+      '_ga_81T8RNHFB7=GS2.1.s1773239749$o4$g1$t1773239768$j41$l0$h0',
+    'DNT': '1',
+    'Faces-Request': 'partial/ajax',
+    'Host': 'services.pocosdecaldas.mg.gov.br',
+    'Origin': 'https://services.pocosdecaldas.mg.gov.br',
+    'Priority': 'u=0',
+    'Referer': 'https://services.pocosdecaldas.mg.gov.br/editais/',
+    'Sec-Fetch-Dest': 'empty',
+    'Sec-Fetch-Mode': 'cors',
+    'Sec-Fetch-Site': 'same-origin',
+    'X-Requested-With': 'XMLHttpRequest'
+  };
 
-for (let i = 0; i < pocosDeCaldasMaxPages; i++) {
-  console.log('Buscando editais para os editais de Pocos de Caldas na página: [' + (i + 1) + ']')
-  const params = new URLSearchParams();
-  const body = params.toString()
-  const method = 'POST'
+  for (let i = 0; i < pocosDeCaldasMaxPages; i++) {
+    console.log('Buscando editais para os editais de Pocos de Caldas na página: [' + (i + 1) + ']')
+    const params = new URLSearchParams();
+    const body = params.toString()
+    const method = 'POST'
 
-  params.append('javax.faces.partial.ajax', 'true');
-  params.append('javax.faces.source', 'formFiles:tabela');
-  params.append('javax.faces.partial.execute', 'formFiles:tabela');
-  params.append('javax.faces.partial.render', 'formFiles:tabela');
-  params.append('formFiles:tabela', 'formFiles:tabela');
-  params.append('formFiles:tabela_pagination', 'true');
-  params.append('formFiles:tabela_rows', '10');
-  params.append('formFiles:tabela_encodeFeature', 'true');
-  params.append('formFiles', 'formFiles');
-  params.append('javax.faces.ViewState', '2481138648726990370:6291030017349225282');
-  params.append('formFiles:tabela_first', i * 10);
+    params.append('javax.faces.partial.ajax', 'true');
+    params.append('javax.faces.source', 'formFiles:tabela');
+    params.append('javax.faces.partial.execute', 'formFiles:tabela');
+    params.append('javax.faces.partial.render', 'formFiles:tabela');
+    params.append('formFiles:tabela', 'formFiles:tabela');
+    params.append('formFiles:tabela_pagination', 'true');
+    params.append('formFiles:tabela_rows', '10');
+    params.append('formFiles:tabela_encodeFeature', 'true');
+    params.append('formFiles', 'formFiles');
+    params.append('javax.faces.ViewState', '2481138648726990370:6291030017349225282');
+    params.append('formFiles:tabela_first', i * 10);
 
-  const response = await fetch(pocosDeCaldasUrl, { method, headers, body })
+    const response = await fetch(pocosDeCaldasUrl, { method, headers, body })
 
-  const text = await response.text();
-  const parser = new XMLParser();
-  const obj = parser.parse(text);
-  const itens = obj['partial-response']['changes']['update']
+    const text = await response.text();
+    const parser = new XMLParser();
+    const obj = parser.parse(text);
+    const itens = obj['partial-response']['changes']['update']
 
-  for (const i of itens) {
-    for (const j of i.split('<')) {
-      if (j.includes('descricaoEdital')) {
-        const description = j.split('>')[1].split('\n').filter(e => e != '').join(' ')
-        allItens.push({ description, links: pocosDeCaldasUrl })
+    for (const i of itens) {
+      for (const j of i.split('<')) {
+        if (j.includes('descricaoEdital')) {
+          const description = j.split('>')[1].split('\n').filter(e => e != '').join(' ')
+          allItens.push({ description, links: pocosDeCaldasUrl })
+        }
       }
     }
   }
@@ -285,7 +324,7 @@ for (let i = 0; i < allItens.length; i++) {
       selectedModelIndex = (selectedModelIndex + 1) % MODELS.length
       console.clear()
       console.log(`Erro ao analisar edital, tentando com o modelo [${MODELS[selectedModelIndex]}]`)
-      await new Promise(resolve => setTimeout(resolve, 6000))
+      await new Promise(resolve => setTimeout(resolve, 2000))
       i--
       continue
     }
