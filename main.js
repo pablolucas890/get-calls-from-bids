@@ -5,6 +5,7 @@ import fs from 'fs';
 import inquirer from 'inquirer';
 import { Agent, setGlobalDispatcher } from 'undici';
 
+// Constants
 const KEYS_TO_INCLUDE = fs.readFileSync('public/keys-include.txt', 'utf8').split('\n').filter(e => e.trim() !== '').map(e => e.trim())
 const KEYS_TO_EXCLUDE = fs.readFileSync('public/keys-exclude.txt', 'utf8').split('\n').filter(e => e.trim() !== '').map(e => e.trim())
 const MODELS = [
@@ -17,15 +18,16 @@ const MODELS = [
   'gemini-2.0-flash',
   'gemini-2.0-flash-lite'
 ]
+const SHOW_HELP = fs.existsSync('public/show-help.txt')
+const MESSAGE = 'Precione qualquer tecla para continuar...'
 
+// Variables
 let allItens = []
 let selectedModelIndex = 0
 let deletedItens = JSON.parse(fs.existsSync('public/deleted.json') ? fs.readFileSync('public/deleted.json', 'utf8') || '[]' : '[]')
 let readLaterItens = JSON.parse(fs.existsSync('public/read-later.json') ? fs.readFileSync('public/read-later.json', 'utf8') || '[]' : '[]')
 
-const showHelp = fs.existsSync('public/show-help.txt')
-const message = 'Precione qualquer tecla para continuar...'
-
+// Config
 dotenv.config();
 const ai = new GoogleGenAI({ apiKey: process.env.GOOGLE_API_KEY });
 
@@ -34,6 +36,7 @@ if (!ai.apiKey) {
   process.exit(1)
 }
 
+// Functions
 async function aiSaysItsWorthIt(title, model) {
   await new Promise(resolve => setTimeout(resolve, 6000))
   const EDITAL_ANALYSIS_PROMPT = fs.readFileSync('public/it-is-worth-it-prompt.txt', 'utf8')
@@ -46,17 +49,32 @@ async function aiSaysItsWorthIt(title, model) {
   return aiText
 }
 
-console.clear()
-const justWithAi = await inquirer.prompt([
-  {
-    type: 'confirm',
-    name: 'confirm',
-    message: 'Deseja analisar os editais somente via AI? [Y = Sim, N = Não] (default: N)'
+async function ask(message, type = 'confirm') {
+  return await inquirer.prompt([{ type, name: 'ask', message }]).then(res => res.ask)
+}
+
+async function handleDelete(deletedItens, readLaterItens, description, links) {
+  deletedItens.push({ description, links })
+
+  const map = new Map()
+  for (const item of deletedItens) {
+    if (!item || !item.description) continue
+    if (!map.has(item.description)) {
+      map.set(item.description, item)
+    }
   }
-]).then(res => res.confirm ?? false)
+  deletedItens = Array.from(map.values())
+
+  readLaterItens = readLaterItens.filter(e => e.description !== description)
+  fs.writeFileSync('public/read-later.json', JSON.stringify(readLaterItens, null, 2))
+  fs.writeFileSync('public/deleted.json', JSON.stringify(deletedItens, null, 2))
+}
 
 // Bootstrapping
-if (!showHelp && !justWithAi) {
+console.clear()
+const justWithAi = (await ask('Deseja analisar os editais somente via AI? [Y = Sim, N = Não] (default: N)')) || false
+
+if (!SHOW_HELP && !justWithAi) {
   const helpTextToShow = [
     '[TIPO] Nesta linha você saberá se é um novo edital ou se é um edital que você já leu e marcou para ler mais tarde\n\n',
     '[PALAVRA-CHAVE] Nesta linha você saberá a palavra-chave que foi usada para encontrar o edital como "SOFTWARE", "SISTEMA"\n\n',
@@ -70,7 +88,7 @@ if (!showHelp && !justWithAi) {
 
   console.clear()
   console.log('\n\n\t\tEste é um script para ajudar a Amoradev a encontrar novos editais de desenvolvimento de software.\n\n')
-  await inquirer.prompt([{ message }])
+  await ask(MESSAGE)
   console.clear()
 
   for (const line of helpTextToShow) {
@@ -81,50 +99,31 @@ if (!showHelp && !justWithAi) {
       console.log(helpTextShowed)
       await new Promise(resolve => setTimeout(resolve, j === 0 ? firstWordTimeout : otherWordTimeout))
     }
-    await inquirer.prompt([{ message }])
+    await ask(MESSAGE)
     helpTextShowed = helpTextShowed.substring(0, helpTextShowed.length - 1)
   }
   fs.writeFileSync('public/show-help.txt', '')
 }
 
-console.clear()
-console.log('\n\n\t\tBora começar?\n\n')
-await inquirer.prompt([{ message }])
-
+// Get Bids from Portal de contas oublicas
 console.clear()
 console.log('\n\n\t\tBuscando editais...\n\n')
-
-// Get Bids from Portal de contas oublicas
 console.log('[PORTAL DE COMPRAS PÚBLICAS]\n')
-const searchOnPortal = await inquirer.prompt([
-  {
-    type: 'confirm',
-    name: 'confirm',
-    message: 'Deseja buscar editais no Portal de Compras Públicas? [Y = Sim, N = Não] (default: Y)'
-  }
-]).then(res => res.confirm ?? true)
-if (searchOnPortal) {
-  const maxPages = await inquirer.prompt([
-    {
-      type: 'input',
-      name: 'maxPages',
-      message: 'Quantas páginas deseja buscar? [default: 2]'
-    }
-  ]).then(res => parseInt(res.maxPages ?? 2)) ?? 2
+if ((await ask('Deseja buscar editais no Portal de Compras Públicas? [Y = Sim, N = Não] (default: Y)'))) {
+  const portalDeContasMaxPages = (await ask('Quantas páginas deseja buscar? [default: 2]', 'input')) || 2
   const portalDeContasUrl = 'https://compras.api.portaldecompraspublicas.com.br/v2/licitacao/processos?limitePagina=12&filtroOrdenacao=3&objeto='
   for (let i = 0; i < KEYS_TO_INCLUDE.length; i++) {
     const key = KEYS_TO_INCLUDE[i]
-    for (let j = 0; j < maxPages; j++) {
-      console.log('Buscando editais para a chave: ' + key + ' na página: ' + j)
+    for (let j = 0; j < portalDeContasMaxPages; j++) {
+      console.log('Buscando editais para a chave: [' + key + '] na página: ' + (j + 1))
       const portalDeContasResponse = await fetch(portalDeContasUrl + key + '&pagina=' + j).then(res => res.json())
       for (const item of portalDeContasResponse?.result ?? []) {
         const links = `https://www.portaldecompraspublicas.com.br/processos${item.urlReferencia}`
-        if (item?.statusProcessoPublico?.descricao == 'Recebendo Propostas'
-          || item?.statusProcessoPublico?.descricao == 'Aguardando Inicio de Recebimento de Propostas') {
-          if (allItens.some(e => e.links === links || e.description === item.resumo)) {
-            continue
-          }
-          allItens.push({ description: item.resumo, links })
+        const processStatus = item?.statusProcessoPublico?.descricao ?? ''
+        const description = item.resumo
+        if (processStatus === 'Recebendo Propostas' || processStatus === 'Aguardando Inicio de Recebimento de Propostas') {
+          if (allItens.some(e => e.links === links || e.description === description)) continue
+          allItens.push({ description, links })
         }
       }
     }
@@ -136,11 +135,12 @@ console.clear()
 console.log('\n\n\t\tBuscando editais...\n\n')
 console.log('[ALERTALICITAÇÃO]\n')
 const cnaeNumbers = [985, 986, 987, 988]
+const alertaLicitacaoMaxPages = (await ask('Quantas páginas deseja buscar? [default: 5]', 'input')) || 5
 const cnaeUrl = 'https://alertalicitacao.com.br'
 for (const cnaeNumber of cnaeNumbers) {
-  console.log('Buscando editais para o CNAE: ' + cnaeNumber)
-  for (let i = 0; i < 5; i++) {
-    console.log('Buscando editais para o CNAE: ' + cnaeNumber + ' na página: ' + i)
+  console.log('Buscando editais para o CNAE: [' + cnaeNumber + ']')
+  for (let i = 0; i < alertaLicitacaoMaxPages; i++) {
+    console.log('Buscando editais para o CNAE: [' + cnaeNumber + '] na página: [' + (i + 1) + ']')
     const cnaeResponse = await fetch(cnaeUrl + '/!cnae/' + cnaeNumber);
     const cnaeText = await cnaeResponse.text();
     cnaeText.replace(/[\r\n]+/g, ' ').split('Cadastrar-se')[1].split('panel').forEach(e => {
@@ -181,6 +181,7 @@ for (const cnaeNumber of cnaeNumbers) {
 console.clear()
 console.log('\n\n\t\tBuscando editais...\n\n')
 console.log('[POCOS DE CALDAS]\n')
+const pocosDeCaldasMaxPages = (await ask('Quantas páginas deseja buscar? [default: 10]', 'input')) || 10
 const agent = new Agent({ connect: { rejectUnauthorized: false } });
 setGlobalDispatcher(agent);
 const pocosDeCaldasUrl = 'https://services.pocosdecaldas.mg.gov.br/editais/login.xhtml'
@@ -207,7 +208,8 @@ const headers = {
   'X-Requested-With': 'XMLHttpRequest'
 };
 
-for (let i = 0; i < 10; i++) {
+for (let i = 0; i < pocosDeCaldasMaxPages; i++) {
+  console.log('Buscando editais para os editais de Pocos de Caldas na página: [' + (i + 1) + ']')
   const params = new URLSearchParams();
   const body = params.toString()
   const method = 'POST'
@@ -249,7 +251,9 @@ for (const { description, links } of readLaterItens) {
 }
 
 // Ask user if they want to delete or read later
-for (const { description, links } of allItens) {
+for (let i = 0; i < allItens.length; i++) {
+  const { description, links } = allItens[i]
+
   if (deletedItens.some(e => e.description === description)) {
     continue
   }
@@ -267,27 +271,12 @@ for (const { description, links } of allItens) {
 
   if (!matchedKey) continue
 
-  const handleDeleteOrReadLater = async () => {
-    deletedItens.push({ description, links })
+  const hasReadLater = readLaterItens.some(e => e.description === description)
 
-    const map = new Map()
-    for (const item of deletedItens) {
-      if (!item || !item.description) continue
-      if (!map.has(item.description)) {
-        map.set(item.description, item)
-      }
-    }
-    deletedItens = Array.from(map.values())
-
-    readLaterItens = readLaterItens.filter(e => e.description !== description)
-    fs.writeFileSync('public/read-later.json', JSON.stringify(readLaterItens, null, 2))
-    fs.writeFileSync('public/deleted.json', JSON.stringify(deletedItens, null, 2))
-  }
-
-  if (justWithAi) {
+  if (justWithAi && !hasReadLater) {
     console.clear()
     console.log(`[DESCRIÇÃO] ${description}\n`)
-    console.log(`Analisando edital com o modelo: ${MODELS[selectedModelIndex]}, aguarde...`)
+    console.log(`Analisando edital com o modelo [${MODELS[selectedModelIndex]}], aguarde...`)
     let aiText = null
     try {
       aiText = await aiSaysItsWorthIt(description, MODELS[selectedModelIndex])
@@ -295,37 +284,31 @@ for (const { description, links } of allItens) {
     catch (error) {
       selectedModelIndex = (selectedModelIndex + 1) % MODELS.length
       console.clear()
-      console.log(`Erro ao analisar edital, tentando com o modelo: ${MODELS[selectedModelIndex]}`)
+      console.log(`Erro ao analisar edital, tentando com o modelo [${MODELS[selectedModelIndex]}]`)
       await new Promise(resolve => setTimeout(resolve, 6000))
+      i--
       continue
     }
     console.log(`[AI] ${aiText}\n`)
     await new Promise(resolve => setTimeout(resolve, 1000))
     if (aiText.includes('NÃO VALE A PENA')) {
-      await handleDeleteOrReadLater()
+      await handleDelete(deletedItens, readLaterItens, description, links)
       continue
     }
   }
-  const hasReadLater = readLaterItens.some(e => e.description === description)
+
   console.clear()
   console.log(`[TIPO] ${hasReadLater ? 'Ler mais tarde' : 'Novo'}\n`)
   console.log(`[PALAVRA-CHAVE] ${matchedKey.toUpperCase()}\n`)
   console.log(`[DESCRIÇÃO]\n\n\t${description}\n`)
   console.log(`[LINKS]\n\t${links.split(', ').join('\n\t')}\n`)
-  const userRes = await inquirer.prompt([
-    {
-      type: 'confirm',
-      name: 'confirm',
-      message: 'Descartar este item? [Y = Descartar, N = Ler mais tarde] (default: Y)'
-    }
-  ])
+  const userRes = await ask('Descartar este item? [Y = Descartar, N = Ler mais tarde] (default: Y)')
 
   if (userRes.confirm) {
-    await handleDeleteOrReadLater()
+    await handleDelete(deletedItens, readLaterItens, description, links)
   } else if (!hasReadLater) {
     readLaterItens.push({ description, links })
     fs.writeFileSync('public/read-later.json', JSON.stringify(readLaterItens, null, 2))
-    await handleDeleteOrReadLater()
   }
 }
 
