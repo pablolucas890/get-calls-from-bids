@@ -1,16 +1,11 @@
 software
 hardware
-infraestrutura de ti
-servidor
 servidores
-data center
-datacenter
 cloud
 nuvem
 computação em nuvem
 backup
 storage
-armazenamento
 suporte técnico
 suporte de ti
 manutenção de servidores
