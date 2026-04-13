@@ -85,7 +85,7 @@ async function decreaseTimeoutToWait() {
 // Bootstrapping
 decreaseTimeoutToWait()
 console.clear()
-const justWithAi = (await ask('Deseja analisar os editais somente via AI? [Y = Sim, N = Não] (default: N)')) || false
+const justWithAi = (await ask('Deseja analisar os editais somente via AI? [Y = Sim, N = Não] (default: Y)'))
 
 if (!SHOW_HELP && !justWithAi) {
   const helpTextToShow = [
