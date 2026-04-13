@@ -13,3 +13,40 @@ javascript
 python
 mobile
 android
+responsivo
+typescript
+bash
+rustlang
+c sharp
+c++
+perl
+ios
+react native
+react
+vue
+next.js
+node.js
+nestjs
+laravel
+django
+flask
+fastapi
+express.js
+graphql
+openapi
+api rest
+postgresql
+mysql
+mongodb
+docker
+gitlab ci
+integração contínua
+devops
+websocket
+oauth
+jwt
+eslint
+webpack
+vitejs
+pytest
+selenium
