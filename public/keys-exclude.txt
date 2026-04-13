@@ -5,3 +5,7 @@ autodesk
 adobe
 office
 registro de preços
+licenciamento
+licença
+sass
+locação

@@ -1,42 +1,15 @@
-software
-hardware
-servidores
-cloud
-nuvem
-computação em nuvem
 backup
-storage
-suporte técnico
-suporte de ti
 manutenção de servidores
-service desk
-help desk
 segurança da informação
-segurança de rede
-firewall
 vpn
-monitoramento
-monitoramento de rede
-gestão de ti
-outsourcing de ti
-terceirização de ti
 consultoria de ti
 consultoria em ti
-sistema
-sistemas
-aplicação
-aplicações
 aplicativo
-aplicativos
 banco de dados
 bancos de dados
-programa
-programas
 linux
-virtualização
-vmware
-hyper-v
-rede sem fio
-wi-fi
-wireless
-cabeamento estruturado
+php
+javascript
+python
+mobile
+android
