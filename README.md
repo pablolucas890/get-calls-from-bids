@@ -1,4 +1,6 @@
-# Get calls from bids to Amoradev
+# Get calls from bids
+
+A calls finder using AI and workflow to find good bids to sent proposes by a wordlist
 
 ## Run
 
