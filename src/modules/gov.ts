@@ -10,7 +10,13 @@ if ((await ask('Deseja buscar editais no Gov.BR? [Y = Sim, N = Não] (default: Y
   for (const key of KEYS_TO_INCLUDE) {
     for (let i = 0; i < govBrMaxPages; i++) {
       const govBrUrl = 'https://pncp.gov.br/api/search/?tipos_documento=edital&ordenacao=-data&pagina=' + (i + 1) + '&tam_pagina=10&status=recebendo_proposta&modalidades=6%7C8&tipos=1&q='
-      const govBrResponse = await fetch(govBrUrl + key).then(res => res.json())
+      let govBrResponse: any = null
+      try {
+        govBrResponse = await fetch(govBrUrl + key).then(res => res.json()) as any
+      } catch (error) {
+        console.log(`Erro ao buscar editais para a chave: [${key}] na página: [${i + 1}]`)
+        continue
+      }
       console.log(`Buscando editais para a chave: [${key}] na página: [${i + 1}]`)
       for (const item of govBrResponse?.items ?? []) {
         const description = item.description

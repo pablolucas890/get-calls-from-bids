@@ -12,7 +12,13 @@ if ((await ask('Deseja buscar editais no Portal de Compras Públicas? [Y = Sim, 
     const key = KEYS_TO_INCLUDE[i]
     for (let j = 0; j < portalDeContasMaxPages; j++) {
       console.log('Buscando editais para a chave: [' + key + '] na página: ' + (j + 1))
-      const portalDeContasResponse = await fetch(portalDeContasUrl + key + '&pagina=' + j).then(res => res.json())
+      let portalDeContasResponse: any = null
+      try {
+        portalDeContasResponse = await fetch(portalDeContasUrl + key + '&pagina=' + j).then(res => res.json()) as any
+      } catch (error) {
+        console.log(`Erro ao buscar editais para a chave: [${key}] na página: [${j + 1}]`)
+        continue
+      }
       for (const item of portalDeContasResponse?.result ?? []) {
         const links = `https://www.portaldecompraspublicas.com.br/processos${item.urlReferencia}`
         const processStatus = item?.statusProcessoPublico?.descricao ?? ''
