@@ -1,3 +1,4 @@
 node_modules/
 public/*.json
 .env
+public/show-help.txt
