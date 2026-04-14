@@ -20,7 +20,6 @@ rustlang
 c sharp
 c++
 perl
-ios
 react native
 react
 vue
