@@ -1,6 +1,7 @@
-import { ask } from "../lib/ask.js"
+import { Item } from "../global/props"
+import { ask } from "../lib/ask"
 
-export async function getBidsFromPortalContasPublicas(KEYS_TO_INCLUDE, allItens) {
+export async function getBidsFromPortalContasPublicas(KEYS_TO_INCLUDE: string[], allItens: Item[]) {
 console.clear()
 console.log('\n\n\t\tBuscando editais...\n\n')
 console.log('[PORTAL DE COMPRAS PÚBLICAS]\n')

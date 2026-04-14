@@ -1,35 +1,35 @@
 import { GoogleGenAI } from "@google/genai";
 import dotenv from 'dotenv';
 import fs from 'fs';
-import { DEFAULT_TIMEOUT_TO_WAIT, EDITAL_ANALYSIS_PROMPT, KEYS_TO_EXCLUDE, KEYS_TO_INCLUDE, MESSAGE, MODELS, SHOW_HELP } from "./global/constants.js";
-import { ask } from "./lib/ask.js";
-import { decreaseTimeoutToWait } from "./lib/decreaseTimeoutToWait.js";
-import { handleDelete } from "./lib/handleDelete.js";
-import { itsWorthIt } from "./lib/itsWorthIt.js";
-import { getBidsFromAlertalicitacao } from "./modules/alertaLicitacao.js";
-import { getBidsFromGov } from "./modules/gov.js";
-import { getBidsFromPocosDeCaldas } from "./modules/pocosDeCaldas.js";
-import { getBidsFromPortalContasPublicas } from "./modules/portalContasPublicas.js";
+import { DEFAULT_TIMEOUT_TO_WAIT, EDITAL_ANALYSIS_PROMPT, KEYS_TO_EXCLUDE, KEYS_TO_INCLUDE, MESSAGE, MODELS, SHOW_HELP } from "./global/constants";
+import { Item } from "./global/props";
+import { ask } from "./lib/ask";
+import { decreaseTimeoutToWait } from "./lib/decreaseTimeoutToWait";
+import { handleDelete } from "./lib/handleDelete";
+import { itsWorthIt } from "./lib/itsWorthIt";
+import { getBidsFromAlertalicitacao } from "./modules/alertaLicitacao";
+import { getBidsFromGov } from "./modules/gov";
+import { getBidsFromPocosDeCaldas } from "./modules/pocosDeCaldas";
+import { getBidsFromPortalContasPublicas } from "./modules/portalContasPublicas";
 
 // Variables
 let justWithAi = false
-let allItens = []
+let allItens: Item[] = []
 let selectedModelIndex = 0
-let deletedItens = JSON.parse(fs.existsSync('public/deleted.json') ? fs.readFileSync('public/deleted.json', 'utf8') || '[]' : '[]')
-let readLaterItens = JSON.parse(fs.existsSync('public/read-later.json') ? fs.readFileSync('public/read-later.json', 'utf8') || '[]' : '[]')
+let deletedItens: Item[] = JSON.parse(fs.existsSync('public/deleted.json') ? fs.readFileSync('public/deleted.json', 'utf8') || '[]' : '[]')
+let readLaterItens: Item[] = JSON.parse(fs.existsSync('public/read-later.json') ? fs.readFileSync('public/read-later.json', 'utf8') || '[]' : '[]')
 let timeoutToWait = 0
 
 // Config
 dotenv.config();
-const ai = new GoogleGenAI({ apiKey: process.env.GOOGLE_API_KEY });
-
-if (!ai?.apiKey) {
+if (!process.env.GOOGLE_API_KEY) {
   console.error('API KEY não encontrada')
   process.exit(1)
 }
+const ai = new GoogleGenAI({ apiKey: process.env.GOOGLE_API_KEY });
+
 
 async function bootstrap() {
-  decreaseTimeoutToWait()
   console.clear()
   justWithAi = (await ask('Deseja analisar os editais somente via AI? [Y = Sim, N = Não] (default: Y)'))
 
@@ -74,17 +74,17 @@ async function main() {
 
   // Remove duplicates from allItens
   {
-    const map = new Map()
+    const map = new Map<string, Item>()
     for (const item of deletedItens) {
       if (!item || !item.description) continue
       if (!map.has(item.description)) {
         map.set(item.description, item)
       }
     }
-    deletedItens = Array.from(map.values())
+    deletedItens = Array.from(map.values()) as Item[]
   }
   {
-    const map = new Map()
+    const map = new Map<string, Item>()
     for (const item of allItens) {
       if (!item || !item.description || !item.links) continue
       const key = `${item.description}||${item.links}`
@@ -92,7 +92,7 @@ async function main() {
         map.set(key, item)
       }
     }
-    allItens = Array.from(map.values())
+    allItens = Array.from(map.values()) as Item[]
   }
 
   // Add read later items to allItens if they are not already in allItens
@@ -110,7 +110,7 @@ async function main() {
       continue
     }
 
-    let matchedKey = null
+    let matchedKey: string | null = null
     for (const key of KEYS_TO_INCLUDE) {
       if (
         description.toLowerCase().includes(key.toLowerCase()) &&
@@ -129,7 +129,7 @@ async function main() {
       console.clear()
       console.log(`[DESCRIÇÃO] ${description}\n`)
       console.log(`Analisando edital com o modelo [${MODELS[selectedModelIndex]}], aguarde...`)
-      let aiText = null
+      let aiText: string | null = null
       try {
         aiText = await itsWorthIt(description, MODELS[selectedModelIndex], timeoutToWait, DEFAULT_TIMEOUT_TO_WAIT, EDITAL_ANALYSIS_PROMPT, ai)
       }
@@ -143,7 +143,7 @@ async function main() {
       }
       console.log(`[AI] ${aiText}\n`)
       await new Promise(resolve => setTimeout(resolve, 1000))
-      if (aiText.includes('NÃO VALE A PENA')) {
+      if (aiText && aiText.includes('NÃO VALE A PENA')) {
         await handleDelete(deletedItens, readLaterItens, description, links)
         continue
       }
@@ -170,5 +170,6 @@ async function main() {
   process.exit(0)
 }
 
+decreaseTimeoutToWait(timeoutToWait)
 await bootstrap()
 await main()

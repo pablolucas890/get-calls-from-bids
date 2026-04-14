@@ -1,8 +1,9 @@
 import { XMLParser } from 'fast-xml-parser';
 import { Agent, setGlobalDispatcher } from 'undici';
+import { Item } from "../global/props";
 import { ask } from "../lib/ask.js";
 
-export async function getBidsFromPocosDeCaldas(allItens) {
+export async function getBidsFromPocosDeCaldas(allItens: Item[]) {
 
 console.clear()
 console.log('\n\n\t\tBuscando editais...\n\n')
@@ -51,7 +52,7 @@ if ((await ask('Deseja buscar editais no Pocos de Caldas? [Y = Sim, N = Não] (d
     params.append('formFiles:tabela_encodeFeature', 'true');
     params.append('formFiles', 'formFiles');
     params.append('javax.faces.ViewState', '2481138648726990370:6291030017349225282');
-    params.append('formFiles:tabela_first', i * 10);
+    params.append('formFiles:tabela_first', (i * 10).toString());
 
     const response = await fetch(pocosDeCaldasUrl, { method, headers, body })
 

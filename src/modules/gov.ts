@@ -1,9 +1,10 @@
-import { ask } from "../lib/ask.js"
+import { Item } from "../global/props"
+import { ask } from "../lib/ask"
 
-export async function getBidsFromGov(KEYS_TO_INCLUDE, allItens) {
+export async function getBidsFromGov(KEYS_TO_INCLUDE: string[], allItens: Item[]) {
 console.clear()
 console.log('\n\n\t\tBuscando editais...\n\n')
-console.log('[GOV.BR]\n')
+console.log('[GOV.BR]\n') 
 if ((await ask('Deseja buscar editais no Gov.BR? [Y = Sim, N = Não] (default: Y)'))) {
   const govBrMaxPages = (await ask('Quantas páginas deseja buscar? [default: 1]', 'input')) || 1
   for (const key of KEYS_TO_INCLUDE) {

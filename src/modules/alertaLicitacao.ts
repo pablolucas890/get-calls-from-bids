@@ -1,6 +1,7 @@
-import { ask } from "../lib/ask.js"
+import { Item } from "../global/props"
+import { ask } from "../lib/ask"
 
-export async function getBidsFromAlertalicitacao(allItens) {
+export async function getBidsFromAlertalicitacao(allItens: Item[]) {
 console.clear()
 console.log('\n\n\t\tBuscando editais...\n\n')
 console.log('[ALERTALICITAÇÃO]\n')

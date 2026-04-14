@@ -1,4 +1,6 @@
-export async function itsWorthIt(title, model, timeoutToWait, DEFAULT_TIMEOUT_TO_WAIT, EDITAL_ANALYSIS_PROMPT, ai) {
+import { GoogleGenAI } from "@google/genai"
+
+export async function itsWorthIt(title: string, model: string, timeoutToWait: number, DEFAULT_TIMEOUT_TO_WAIT: number, EDITAL_ANALYSIS_PROMPT: string, ai: GoogleGenAI) {
   const beforeAiTimeout = timeoutToWait
   const response = await ai.models.generateContent({
     model: model,
