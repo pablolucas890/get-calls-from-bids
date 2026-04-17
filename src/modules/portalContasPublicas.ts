@@ -1,12 +1,17 @@
 import { Item } from "../global/props"
 import { ask } from "../lib/ask"
 
-export async function getBidsFromPortalContasPublicas(KEYS_TO_INCLUDE: string[], allItens: Item[]) {
+export async function getBidsFromPortalContasPublicas(KEYS_TO_INCLUDE: string[], allItens: Item[], portalDeContasPages?: number) {
 console.clear()
 console.log('\n\n\t\tBuscando editais...\n\n')
 console.log('[PORTAL DE COMPRAS PÚBLICAS]\n')
-if ((await ask('Deseja buscar editais no Portal de Compras Públicas? [Y = Sim, N = Não] (default: Y)'))) {
-  const portalDeContasMaxPages = (await ask('Quantas páginas deseja buscar? [default: 2]', 'input')) || 2
+if (portalDeContasPages ? portalDeContasPages > 0 : (await ask('Deseja buscar editais no Portal de Compras Públicas? [Y = Sim, N = Não] (default: Y)'))) {
+  let portalDeContasMaxPages = 2
+  if (portalDeContasPages) {
+    portalDeContasMaxPages = portalDeContasPages
+  } else {
+    portalDeContasMaxPages = (await ask('Quantas páginas deseja buscar? [default: 2]', 'input')) || 2
+  }
   const portalDeContasUrl = 'https://compras.api.portaldecompraspublicas.com.br/v2/licitacao/processos?limitePagina=12&filtroOrdenacao=3&objeto='
   for (let i = 0; i < KEYS_TO_INCLUDE.length; i++) {
     const key = KEYS_TO_INCLUDE[i]

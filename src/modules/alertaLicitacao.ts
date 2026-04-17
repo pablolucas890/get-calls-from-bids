@@ -1,13 +1,18 @@
 import { Item } from "../global/props"
 import { ask } from "../lib/ask"
 
-export async function getBidsFromAlertalicitacao(allItens: Item[]) {
+export async function getBidsFromAlertalicitacao(allItens: Item[], alertaLicitacaoPages?: number) {
 console.clear()
 console.log('\n\n\t\tBuscando editais...\n\n')
 console.log('[ALERTALICITAÇÃO]\n')
-if ((await ask('Deseja buscar editais no Alertalicitacao? [Y = Sim, N = Não] (default: Y)'))) {
+if (alertaLicitacaoPages ? alertaLicitacaoPages > 0 : (await ask('Deseja buscar editais no Alertalicitacao? [Y = Sim, N = Não] (default: Y)'))) {
   const cnaeNumbers = [985, 986, 987, 988]
-  const alertaLicitacaoMaxPages = (await ask('Quantas páginas deseja buscar? [default: 5]', 'input')) || 5
+  let alertaLicitacaoMaxPages = 5
+  if (alertaLicitacaoPages) {
+    alertaLicitacaoMaxPages = alertaLicitacaoPages
+  } else {
+    alertaLicitacaoMaxPages = (await ask('Quantas páginas deseja buscar? [default: 5]', 'input')) || 5
+  }
   const cnaeUrl = 'https://alertalicitacao.com.br'
   for (const cnaeNumber of cnaeNumbers) {
     console.log('Buscando editais para o CNAE: [' + cnaeNumber + ']')

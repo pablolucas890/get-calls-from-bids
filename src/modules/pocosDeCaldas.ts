@@ -3,13 +3,18 @@ import { Agent, setGlobalDispatcher } from 'undici';
 import { Item } from "../global/props";
 import { ask } from "../lib/ask.js";
 
-export async function getBidsFromPocosDeCaldas(allItens: Item[]) {
+export async function getBidsFromPocosDeCaldas(allItens: Item[], pocosDeCaldasPages?: number) {
 
 console.clear()
 console.log('\n\n\t\tBuscando editais...\n\n')
 console.log('[POCOS DE CALDAS]\n')
-if ((await ask('Deseja buscar editais no Pocos de Caldas? [Y = Sim, N = Não] (default: Y)'))) {
-  const pocosDeCaldasMaxPages = (await ask('Quantas páginas deseja buscar? [default: 10]', 'input')) || 10
+if (pocosDeCaldasPages ? pocosDeCaldasPages > 0 : (await ask('Deseja buscar editais no Pocos de Caldas? [Y = Sim, N = Não] (default: Y)'))) {
+  let pocosDeCaldasMaxPages = 10
+  if (pocosDeCaldasPages) {
+    pocosDeCaldasMaxPages = pocosDeCaldasPages
+  } else {
+    pocosDeCaldasMaxPages = (await ask('Quantas páginas deseja buscar? [default: 10]', 'input')) || 10
+  }
   const agent = new Agent({ connect: { rejectUnauthorized: false } });
   setGlobalDispatcher(agent);
   const pocosDeCaldasUrl = 'https://services.pocosdecaldas.mg.gov.br/editais/login.xhtml'

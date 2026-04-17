@@ -12,6 +12,14 @@ import { getBidsFromGov } from "./modules/gov";
 import { getBidsFromPocosDeCaldas } from "./modules/pocosDeCaldas";
 import { getBidsFromPortalContasPublicas } from "./modules/portalContasPublicas";
 
+// Arguments
+const args = process.argv.slice(2)
+const govPages = args[0]
+const portalDeContasPages = args[1]
+const alertaLicitacaoPages = args[2]
+const pocosDeCaldasPages = args[3]
+const justWithAiArg = args[4]
+
 // Variables
 let justWithAi = false
 let allItens: Item[] = []
@@ -31,7 +39,7 @@ const ai = new GoogleGenAI({ apiKey: process.env.GOOGLE_API_KEY });
 
 async function bootstrap() {
   console.clear()
-  justWithAi = (await ask('Deseja analisar os editais somente via AI? [Y = Sim, N = Não] (default: Y)'))
+  justWithAi = justWithAiArg ? justWithAiArg === 'Y' : (await ask('Deseja analisar os editais somente via AI? [Y = Sim, N = Não] (default: Y)'))
 
   if (!SHOW_HELP && !justWithAi) {
     const helpTextToShow = [
@@ -66,11 +74,12 @@ async function bootstrap() {
 }
 
 async function main() {
+  
   // Get Bids from modules
-  await getBidsFromGov(KEYS_TO_INCLUDE, allItens)
-  await getBidsFromPortalContasPublicas(KEYS_TO_INCLUDE, allItens)
-  await getBidsFromAlertalicitacao(allItens)
-  await getBidsFromPocosDeCaldas(allItens)
+  await getBidsFromGov(KEYS_TO_INCLUDE, allItens, govPages ? Number(govPages) : undefined)
+  await getBidsFromPortalContasPublicas(KEYS_TO_INCLUDE, allItens, portalDeContasPages ? Number(portalDeContasPages) : undefined)
+  await getBidsFromAlertalicitacao(allItens, alertaLicitacaoPages ? Number(alertaLicitacaoPages) : undefined)
+  await getBidsFromPocosDeCaldas(allItens, pocosDeCaldasPages ? Number(pocosDeCaldasPages) : undefined)
 
   // Remove duplicates from allItens
   {

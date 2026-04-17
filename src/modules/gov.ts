@@ -1,12 +1,17 @@
 import { Item } from "../global/props"
 import { ask } from "../lib/ask"
 
-export async function getBidsFromGov(KEYS_TO_INCLUDE: string[], allItens: Item[]) {
+export async function getBidsFromGov(KEYS_TO_INCLUDE: string[], allItens: Item[], govPages?: number) {
 console.clear()
 console.log('\n\n\t\tBuscando editais...\n\n')
 console.log('[GOV.BR]\n') 
-if ((await ask('Deseja buscar editais no Gov.BR? [Y = Sim, N = Não] (default: Y)'))) {
-  const govBrMaxPages = (await ask('Quantas páginas deseja buscar? [default: 1]', 'input')) || 1
+if (govPages ? govPages > 0 : (await ask('Deseja buscar editais no Gov.BR? [Y = Sim, N = Não] (default: Y)'))) {
+  let govBrMaxPages = 1
+  if (govPages) {
+    govBrMaxPages = govPages
+  } else {
+    govBrMaxPages = (await ask('Quantas páginas deseja buscar? [default: 1]', 'input')) || 1
+  }
   for (const key of KEYS_TO_INCLUDE) {
     for (let i = 0; i < govBrMaxPages; i++) {
       const govBrUrl = 'https://pncp.gov.br/api/search/?tipos_documento=edital&ordenacao=-data&pagina=' + (i + 1) + '&tam_pagina=10&status=recebendo_proposta&modalidades=6%7C8&tipos=1&q='
