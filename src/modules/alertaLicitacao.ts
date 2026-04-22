@@ -18,7 +18,13 @@ if (alertaLicitacaoPages ? alertaLicitacaoPages > 0 : (await ask('Deseja buscar 
     console.log('Buscando editais para o CNAE: [' + cnaeNumber + ']')
     for (let i = 0; i < alertaLicitacaoMaxPages; i++) {
       console.log('Buscando editais para o CNAE: [' + cnaeNumber + '] na página: [' + (i + 1) + ']')
-      const cnaeResponse = await fetch(cnaeUrl + '/!cnae/' + cnaeNumber);
+      let cnaeResponse: any = null
+      try {
+        cnaeResponse = await fetch(cnaeUrl + '/!cnae/' + cnaeNumber);
+      } catch (error) {
+        console.log(`Erro ao buscar editais para o CNAE: [${cnaeNumber}] na página: [${i + 1}]`)
+        continue
+      }
       const cnaeText = await cnaeResponse.text();
       cnaeText.replace(/[\r\n]+/g, ' ').split('Cadastrar-se')[1].split('panel').forEach(e => {
         const description = e.split('no-class')[1]?.split('</b>')[1].trim()?.split('</p>')[0].trim().replace(/[.]+/g, '')
